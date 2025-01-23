@@ -1,0 +1,4 @@
+flask-3.1.0
+python-docx==0.8.11
+
+In this speech to text python flask web application ,I have used web speech API for realtime automatic speech recogniton
