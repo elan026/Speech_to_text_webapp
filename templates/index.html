@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech-to-Text WebApp</title>
+    <style>
+        body {
+            
+            font-family: Arial, sans-serif; /* Optional: Sets the default font */
+            color: #fff; /* Ensures text is readable */
+            margin: 0; /* Removes default body margin */
+            padding: 0; /* Removes default body padding */
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #background-video {
+            position: fixed; /* Ensures the video stays in the same position */
+            top: 0;
+            left: 0;
+            width: 100vw; /* Makes the video span the entire viewport width */
+            height: 100vh; /* Makes the video span the entire viewport height */
+            object-fit: cover; /* Ensures the video covers the entire area without distortion */
+            z-index: -1; /* Places the video behind all content */
+        }
+
+            textarea {
+                width: 100%; /* Ensures it spans the full width of its container */
+                margin-top: 10px;
+                background-color: rgba(0, 0, 0, 0.5); /* Sets a semi-transparent background color */
+                color: #fff; /* Sets the text color to white for better contrast */
+                border: 1px solid #ccc; /* Optional: Adds a light border */
+                border-radius: 5px; /* Adds rounded corners */
+                padding: 10px; /* Adds padding inside the textarea */
+                font-size: 16px; /* Adjusts font size for readability */
+            }
+        
+            textarea::placeholder {
+                color: #ddd; /* Sets a light color for the placeholder text */
+            }
+        
+
+        .container {
+            background-color: rgba(0, 0, 0, 0.6); /* Adds a semi-transparent background to improve readability */
+            padding: 20px;
+            margin: 50px auto;
+            border-radius: 10px;
+            max-width: 600px;
+            text-align: center;
+
+            position: relative; /* Keeps content positioned above the video */
+            z-index: 1; /* Places content above the background video */
+            background-color: rgba(0, 0, 0, 0.6); /* Optional: Semi-transparent background for content */
+            padding: 20px;
+            margin: 50px auto;
+            border-radius: 10px;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        textarea {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+        }
+
+        #credits {
+            position: fixed; /* Fixes the element relative to the viewport */
+            bottom: 0px; /* Adjusts the distance from the bottom (20px above the bottom) */
+            width: 100%; /* Ensures it spans the full width */
+            text-align: center; /* Centers the text */
+            color: #fff; /* Makes the text white */
+            padding: 10px 0; /* Adds vertical padding inside the tag */
+            font-size: 15px; /* Adjusts font size */
+         }
+        
+        
+
+    </style>
+</head>
+<body>
+    <video id="background-video" autoplay loop muted>
+        <source src="static/background.mp4" type="video/mp4">
+        Your browser does not support HTML5 video.
+    </video>
+    
+    <h1>Speech-to-Text Web Application</h1>
+    <div class="container">
+        <label for="language">Select Language:</label>
+        <select id="language">
+            <option value="en-IN">English (India)</option>
+            <option value="hi-IN">Hindi</option>
+            <option value="ta-IN">Tamil</option>
+            <option value="te-IN">Telugu</option>
+            <option value="kn-IN">Kannada</option>
+            <option value="ml-IN">Malayalam</option>
+            <option value="gu-IN">Gujarati</option>
+            <option value="mr-IN">Marathi</option>
+            <option value="pa-IN">Punjabi</option>
+            <option value="bn-IN">Bengali</option>
+        </select>
+        <div id="status">Click "Start" to begin recording...</div>
+        <textarea id="transcript" rows="10" placeholder="Your speech will appear here..." readonly></textarea>
+        <button id="start-btn">Start Recording</button>
+        <button id="stop-btn" disabled>Stop Recording</button>
+        <form id="download-form" action="/download" method="POST">
+            <input type="hidden" name="transcript_text" id="hidden-input">
+            <button type="submit" id="download-btn" disabled>Download Transcript</button>
+        </form>
+    </div>
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const transcriptArea = document.getElementById('transcript');
+        const downloadForm = document.getElementById('download-form');
+        const hiddenInput = document.getElementById('hidden-input');
+        const downloadBtn = document.getElementById('download-btn');
+        const statusDiv = document.getElementById('status');
+        const languageDropdown = document.getElementById('language');
+
+        let recognition;
+        let isRecording = false;
+
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Your browser does not support the Web Speech API. Please use Google Chrome.");
+        } else {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isRecording = true;
+                statusDiv.textContent = "Listening...";
+                transcriptArea.value = "";
+                downloadBtn.disabled = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                transcriptArea.value = transcript.trim();
+                hiddenInput.value = transcript.trim();
+                if (transcript.trim().length > 0) {
+                    downloadBtn.disabled = false;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                statusDiv.textContent = `Error occurred: ${event.error}`;
+                stopRecording();
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                statusDiv.textContent = "Recording stopped. You can download the transcript.";
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            };
+        }
+
+        const startRecording = () => {
+            if (!isRecording) {
+                const language = languageDropdown.value;
+                recognition.lang = language;
+                recognition.start();
+            }
+        };
+
+        const stopRecording = () => {
+            if (isRecording) {
+                recognition.stop();
+            }
+        };
+
+        startBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+    </script>
+    <h4 id="credits">
+        © Created by ElangoKandhasamy And Preethi Gnanavel
+    </h4>
+</body>
+</html>
